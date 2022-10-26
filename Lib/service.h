@@ -95,8 +95,9 @@ void upload(int sockfd, int type, struct sockaddr_in addr, struct segment_packet
     //Apro il file
     if((fd=open(data.data,O_RDONLY))<0){
         perror("errore apertura file da inviare"); 
-        data.length=htons(strlen("Get fallita: file non presente sul server"));
-        strcpy(data.data,"Get fallita: file non presente sul server");
+        data.length=htons(strlen("Get fallita: file non presente"));
+        strcpy(data.data,"Get fallita: file non presente");
+        close(sockfd);
         exit(EXIT_FAILURE);
      }
     //Calcolo dimensione file
@@ -302,7 +303,7 @@ void download(int sockfd, int type, struct segment_packet data, struct sockaddr_
   if ( type != LIST){
     //Apro file
     if((fd = open(data.data, O_RDWR | O_CREAT| O_TRUNC, 0666))<0){
-      perror("errore apertura/creazione file da ricevere controllare che il file sia presente sul server");
+      perror("errore apertura/creazione file da ricevere controllare che il file sia presente");
       exit(EXIT_FAILURE);
     }
   }
@@ -471,7 +472,7 @@ void get_client(int sockfd, struct sockaddr_in servaddr, double timer, float los
   long seconds = (end.tv_sec - start.tv_sec);
   long micros = ((seconds * 1000000) + end.tv_usec) - (start.tv_usec);
  
-  printf("La GET del client ha impiegato %ld secondi e %ld microsecondi\n", seconds, micros);
+  printf("La GET ha impiegato %ld secondi e %ld microsecondi\n", seconds, micros);
 
   exit(EXIT_SUCCESS);
 }
@@ -480,6 +481,7 @@ void list_client(int sockfd, struct sockaddr_in servaddr, double timer, float lo
   struct segment_packet data;
   char* rm_string;
   bool dyn_timer_enable=false;
+  struct timeval start, end;
 
   memset((void *)&data,0,sizeof(data));
 
@@ -493,6 +495,8 @@ void list_client(int sockfd, struct sockaddr_in servaddr, double timer, float lo
   rm_string=malloc(strlen(data.data)+3);
   sprintf(rm_string,"rm %s",data.data);
 
+  gettimeofday(&start, NULL);
+
   if(!send_request(sockfd, LIST, data, timer, dyn_timer_enable)){
       exit(EXIT_FAILURE);
   }
@@ -504,12 +508,21 @@ void list_client(int sockfd, struct sockaddr_in servaddr, double timer, float lo
   download(sockfd, LIST, data, servaddr, loss_rate, rm_string);
 
   printf("\nLIST terminata\n\n");
+
+  gettimeofday(&end, NULL);
+
+  long seconds = (end.tv_sec - start.tv_sec);
+  long micros = ((seconds * 1000000) + end.tv_usec) - (start.tv_usec);
+ 
+  printf("La LIST ha impiegato %ld secondi e %ld microsecondi\n", seconds, micros);
+
   exit(EXIT_SUCCESS);
 }
 
 void put_client(int sockfd, struct sockaddr_in servaddr, double timer, int window_size, float loss_rate){
   struct segment_packet data;
   bool dyn_timer_enable=false;
+  struct timeval start, end;
 
   //Attivo timer dinamico
   if(timer<0){
@@ -520,7 +533,7 @@ void put_client(int sockfd, struct sockaddr_in servaddr, double timer, int windo
 
   //Scelta del file da caricare su server
   file_choice:
-  printf("Inserire il nome del file da scaricare (con estensione):\n");
+  printf("Inserire il nome del file da caricare (con estensione):\n");
   if(scanf("%s",data.data)!=1){
     perror("inserire un nome valido");
     char c;
@@ -528,12 +541,22 @@ void put_client(int sockfd, struct sockaddr_in servaddr, double timer, int windo
     goto file_choice;
   }
 
+  gettimeofday(&start, NULL);
+
   if(!send_request(sockfd, PUT, data, timer, dyn_timer_enable)){
       exit(EXIT_FAILURE);
   }
 
   upload(sockfd, PUT, servaddr, data, dyn_timer_enable, timer, window_size, loss_rate);
   printf("PUT terminata\n");
+
+   gettimeofday(&end, NULL);
+
+  long seconds = (end.tv_sec - start.tv_sec);
+  long micros = ((seconds * 1000000) + end.tv_usec) - (start.tv_usec);
+ 
+  printf("La PUT ha impiegato %ld secondi e %ld microsecondi\n", seconds, micros);
+
   exit(EXIT_SUCCESS);
 }
 
