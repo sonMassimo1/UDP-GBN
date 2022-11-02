@@ -136,16 +136,8 @@ int main(int argc, char *argv[]){
       printf("SYN inviato\n");
     }
 
-    //Timeout
-    if(((double)(clock()-timer_sample)*1000/CLOCKS_PER_SEC > syn_timer) && (timer_enable)){ 
-      timer_sample = clock();
-
-      //Se il timer scade probabilmente e' troppo breve, lo raddoppio
-      if(dyn_timer_enable)
-        syn_timer=syn_timer*2;
-
+    if(timeout(timer_sample, timer_enable, dyn_timer_enable, &syn_timer, &trial_counter)){
       SYN_sended=false;
-      trial_counter++;
       printf("Timeout SYN\n");
     }
 
@@ -208,19 +200,15 @@ int main(int argc, char *argv[]){
     }
     switch(n){
       case PUT:
-        //system("clear");
         alarm(0);
         put_client(sockfd, child_addr, timer, window_size, loss_rate);
         //put(sockfd);
         break;
       case GET:
-        //system("clear");
         alarm(0);
         get_client(sockfd, servaddr, timer, loss_rate);
         break;
       case LIST:
-        //system("clear");
-        //list(sockfd);
         alarm(0);
         list_client(sockfd, servaddr, timer, loss_rate);
         break;

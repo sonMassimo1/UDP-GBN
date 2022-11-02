@@ -240,7 +240,6 @@ int main(int argc, char *argv[]){
           case PUT:
             alarm(0);
             ack.type=htons(PUT);
-            printf("ascolto");
             //ACK comando
             if(sendto(child_sockfd, &ack, sizeof(ack), 0, (struct sockaddr *)&child_addr, sizeof(child_addr))<0){
               perror("errore sendto ack comando");
