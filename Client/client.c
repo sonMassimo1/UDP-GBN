@@ -75,6 +75,9 @@ int main(int argc, char *argv[]){
   else
     syn_timer=timer;
 
+
+  print_head();
+  
   //Creazione socket
   if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { 
     perror("errore in socket");

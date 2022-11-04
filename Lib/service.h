@@ -17,21 +17,21 @@
 #include <math.h>
 
 
-// void print_head()
-// {
-//   system("clear");
-//   printf("########################################################################################## \n");
-//   printf("ooooo     ooo oooooooooo.   ooooooooo.             .oooooo.    oooooooooo.  ooooo      ooo \n");
-//   printf("`888'     `8' `888'   `Y8b  `888   `Y88.          d8P'  `Y8b   `888'   `Y8b `888b.     `8' \n");
-//   printf(" 888       8   888      888  888   .d88'         888            888     888  8 `88b.    8  \n");
-//   printf(" 888       8   888      888  888ooo88P'          888            888oooo888'  8   `88b.  8 \n");
-//   printf(" 888       8   888      888  888         8888888 888     ooooo  888    `88b  8     `88b.8  \n");
-//   printf(" `88.    .8'   888     d88'  888                 `88.    .88'   888    .88P  8       `888  \n");
-//   printf("   `YbodP'    o888bood8P'   o888o                 `Y8bood8P'   o888bood8P'  o8o        `8  \n");
-//   printf("########################################################################################## \n");
-//   printf("\n");
-//   printf("                                                         Creato da Massimo Mazzetti 0253467\n\n");
-// }
+void print_head()
+{
+  system("clear");
+  printf("########################################################################################## \n");
+  printf("ooooo     ooo oooooooooo.   ooooooooo.             .oooooo.    oooooooooo.  ooooo      ooo \n");
+  printf("`888'     `8' `888'   `Y8b  `888   `Y88.          d8P'  `Y8b   `888'   `Y8b `888b.     `8' \n");
+  printf(" 888       8   888      888  888   .d88'         888            888     888  8 `88b.    8  \n");
+  printf(" 888       8   888      888  888ooo88P'          888            888oooo888'  8   `88b.  8 \n");
+  printf(" 888       8   888      888  888         8888888 888     ooooo  888    `88b  8     `88b.8  \n");
+  printf(" `88.    .8'   888     d88'  888                 `88.    .88'   888    .88P  8       `888  \n");
+  printf("   `YbodP'    o888bood8P'   o888o                 `Y8bood8P'   o888bood8P'  o8o        `8  \n");
+  printf("########################################################################################## \n");
+  printf("\n");
+  printf("                                                         Creato da Massimo Mazzetti 0253467\n\n");
+}
 
 
 /// simulate_loss 
@@ -84,15 +84,13 @@ bool simulate_loss(float loss_rate)
 /// @return 
 bool timeout(clock_t timer_sample, bool timer_enable, bool dyn_timer_enable, double *timer, int *trial_counter)
 { 
-  double x =(clock() - timer_sample) *1000 / CLOCKS_PER_SEC ;
-  //printf("%f, %f\n", x, *timer);
   bool timeout = (( (double) ( (clock() - timer_sample) *1000 )/ CLOCKS_PER_SEC) > (*timer));
   if ((timer_enable) && (timeout))
   {
     timer_sample = clock();
     if (dyn_timer_enable)
     {
-      if ( (*timer) > 10000 )
+      if ( 2 * (*timer) > 10000 )
       {
         *timer = 1000; // timer troppo elevato provo a "sbloccare" il canale (forzandolo) e limitare l'attesa
       }
@@ -141,6 +139,8 @@ void upload(int sockfd, int type, struct sockaddr_in addr, struct segment_packet
     strcpy(data.data, "Put fallita: errore interno del client");
     goto input_termination;
   }
+
+  printf(" tipo dato %d\n", data.type);
 
   if (type != LIST)
   {
@@ -271,7 +271,6 @@ void upload(int sockfd, int type, struct sockaddr_in addr, struct segment_packet
 
         if ((dyn_timer_enable) && (!RTT_sample_enable))
         {
-          printf("eccolo\n");
           start_sample_RTT = clock();
           RTT_sample_enable = true;
         }
@@ -297,7 +296,7 @@ void upload(int sockfd, int type, struct sockaddr_in addr, struct segment_packet
             printf("SAMPLE RTT %f\n", sample_RTT);
             estimated_RTT = (double)(0.875 * estimated_RTT) + (0.125 * sample_RTT);
             printf("ESTIMATED RTT %f\n", estimated_RTT);
-            dev_RTT = (double)(0.75 * dev_RTT) + (0.25 * fabs(timer - estimated_RTT));
+            dev_RTT = (double)(0.75 * dev_RTT) + (0.25 * fabs(sample_RTT - estimated_RTT));
             printf("DEV RTT %f\n", dev_RTT);
             timer = (double)estimated_RTT + (4 * dev_RTT);        
             printf("ACK %d ricevuto, ricalcolo timer = %f\n", ntohl(ack.seq_no), timer);
@@ -558,6 +557,7 @@ void get_client(int sockfd, struct sockaddr_in servaddr, double timer, float los
   char *rm_string;
   bool dyn_timer_enable = false;
   struct timeval start, end;
+  char file_name[256];
 
   memset((void *)&data, 0, sizeof(data));
 
@@ -571,7 +571,7 @@ void get_client(int sockfd, struct sockaddr_in servaddr, double timer, float los
 // Scelta del file da scaricare dal server
 file_choice:
   printf("Inserire il nome del file da scaricare (con estensione):\n");
-  if (scanf("%s", data.data) != 1)
+  if (scanf("%s", file_name) != 1)
   {
     perror("inserire un nome valido");
     char c;
@@ -581,7 +581,7 @@ file_choice:
     goto file_choice;
   }
 
-  // printf("E' stato scelto %s \n", data.data);
+  printf("E' stato scelto %s \n", data.data);
 
   // Utile solo per la pulizia della directory in caso di errori
   rm_string = malloc(strlen(data.data) + 3);
@@ -589,10 +589,14 @@ file_choice:
 
   gettimeofday(&start, NULL);
 
+  sprintf(data.data, "./files/%s", file_name);
+
   if (!send_request(sockfd, GET, data, timer, dyn_timer_enable))
   {
     exit(EXIT_FAILURE);
   }
+  
+  
 
   download(sockfd, GET, data, servaddr, loss_rate, rm_string);
   printf("\nGET terminata\n\n");
@@ -668,7 +672,7 @@ void put_client(int sockfd, struct sockaddr_in servaddr, double timer, int windo
   struct segment_packet data;
   bool dyn_timer_enable = false;
   struct timeval start, end;
-
+  char file_name[256];
   // Attivo timer dinamico
   if (timer < 0)
   {
@@ -680,7 +684,7 @@ void put_client(int sockfd, struct sockaddr_in servaddr, double timer, int windo
 // Scelta del file da caricare su server
 file_choice:
   printf("Inserire il nome del file da caricare (con estensione):\n");
-  if (scanf("%s", data.data) != 1)
+  if (scanf("%s", file_name) != 1)
   {
     perror("inserire un nome valido");
     char c;
@@ -691,6 +695,8 @@ file_choice:
   }
 
   gettimeofday(&start, NULL);
+
+  sprintf(data.data, "./files/%s", file_name);
 
   if (!send_request(sockfd, PUT, data, timer, dyn_timer_enable))
   {
@@ -730,7 +736,8 @@ void get_server(int sockfd, struct sockaddr_in addr, double timer, int window_si
 
   memset((void *)&data, 0, sizeof(data));
 
-  sprintf(data.data, "./files/%s", file_name);
+
+  sprintf(data.data, "%s", file_name);
   upload(sockfd, GET, addr, data, dyn_timer_enable, timer, window_size, loss_rate);
   printf("\nGet terminata\n");
   exit(EXIT_SUCCESS);
@@ -748,12 +755,10 @@ void put_server(int sockfd, struct sockaddr_in addr, float loss_rate, char *file
   // Pulizia
   memset((void *)&data, 0, sizeof(data));
 
-  sprintf(data.data, "./files/%s", file_name);
-
   // Utile solo per la pulizia della directory in caso di errori
   rm_string = malloc(strlen(data.data) + 3);
   sprintf(rm_string, "rm %s", data.data);
-
+  sprintf(data.data, "%s", file_name);
   download(sockfd, PUT, data, addr, loss_rate, rm_string);
   close(sockfd);
   printf("\nPut terminata\n\n");

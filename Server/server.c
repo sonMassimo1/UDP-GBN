@@ -84,6 +84,8 @@ int main(int argc, char *argv[]){
   else
     synack_timer=timer;
 
+  print_head();
+
   //Seed per la perdita simulata
   srand48(time(NULL));
 
@@ -193,16 +195,8 @@ int main(int argc, char *argv[]){
         printf("SYNACK inviato\n");
       }
 
-      //Timeout
-      if(((double)(clock()-timer_sample)*1000/CLOCKS_PER_SEC > synack_timer) && (timer_enable)){ 
-        timer_sample = clock();
-
-        //Se il timer scade probabilmente e' troppo breve, lo raddoppio
-        if(dyn_timer_enable)
-          synack_timer=synack_timer*2;
-
+      if(timeout(timer_sample, timer_enable, dyn_timer_enable, &synack_timer, &trial_counter)){
         SYNACK_sended=false;
-        trial_counter++;
         printf("Timeout SYNACK\n");
       }
 
