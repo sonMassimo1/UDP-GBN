@@ -92,7 +92,7 @@ bool timeout(clock_t timer_sample, bool timer_enable, bool dyn_timer_enable, dou
     {
       if ( 2 * (*timer) > 10000 )
       {
-        *timer = 1000; // timer troppo elevato provo a "sbloccare" il canale (forzandolo) e limitare l'attesa
+        *timer = DEFAULT_TIMER; // timer troppo elevato provo a "sbloccare" il canale (forzandolo) e limitare l'attesa
       }
       else
       {
@@ -140,7 +140,6 @@ void upload(int sockfd, int type, struct sockaddr_in addr, struct segment_packet
     goto input_termination;
   }
 
-  printf(" tipo dato %d\n", data.type);
 
   if (type != LIST)
   {
@@ -156,7 +155,7 @@ void upload(int sockfd, int type, struct sockaddr_in addr, struct segment_packet
     lseek(fd, 0, SEEK_SET);
     file_size = lseek(fd, 0, SEEK_END);
     lseek(fd, 0, SEEK_SET);
-    int num_pack = (ceil((file_size / MAXLINE)));
+    int num_pack = (ceil((file_size / MTU)));
     printf("Sto inviando %d pacchetti\n", num_pack);
   }
   else
@@ -189,7 +188,7 @@ void upload(int sockfd, int type, struct sockaddr_in addr, struct segment_packet
   memset((void *)&ack, 0, sizeof(ack));
 
   // Invio dati
-  while (((ntohl(ack.seq_no) + 1) * MAXLINE < file_size) || ((ntohl(ack.seq_no) + 1) < num_of_files))
+  while (((ntohl(ack.seq_no) + 1) * MTU < file_size) || ((ntohl(ack.seq_no) + 1) < num_of_files))
   {
 
     // Se ci sono troppe ritrasmissioni lascio stare
@@ -205,7 +204,7 @@ void upload(int sockfd, int type, struct sockaddr_in addr, struct segment_packet
     {
       if (type != LIST)
       {
-        if ((packet_buffer[next_seq_no % window_size].length = htons(read(fd, packet_buffer[next_seq_no % window_size].data, MAXLINE))) > 0)
+        if ((packet_buffer[next_seq_no % window_size].length = htons(read(fd, packet_buffer[next_seq_no % window_size].data, MTU))) > 0)
         {
           packet_buffer[next_seq_no % window_size].seq_no = htonl(next_seq_no);
           packet_buffer[next_seq_no % window_size].type = htons(NORMAL);
@@ -213,7 +212,6 @@ void upload(int sockfd, int type, struct sockaddr_in addr, struct segment_packet
           // Se e' attivato il timer dinamico campiono per calcolare l'rtt
           if ((dyn_timer_enable) && (!RTT_sample_enable))
           {
-            printf("eccolo\n");
             start_sample_RTT = clock();
             RTT_sample_enable = true;
           }
