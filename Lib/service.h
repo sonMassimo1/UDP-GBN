@@ -81,7 +81,7 @@ bool timeout(clock_t timer_sample, bool timer_enable, bool dyn_timer_enable, dou
       }
     }
     *trial_counter = *trial_counter + 1;
-    printf("Timeout, new timer =%f\n", *timer);
+    printf("Timeout, Nuovo timer =%f\n", *timer);
     return true;
   }
   
@@ -112,7 +112,7 @@ void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool d
   long file_size = 0, num_of_files = 0;
   off_t head;
   int type= data.type;
-  int pkg_send =0, pkg_loss =0;
+  int pkg_send =0, pkg_loss =0, pkg_resend = 0;
 
   // Alloco il buffer della finestra
   if ((packet_buffer = malloc(window_size * sizeof(struct data_packet))) == NULL)
@@ -198,8 +198,8 @@ void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool d
           {
             start_sample_RTT = clock();
           }
-          printf("Inviato pacchetto %d\n", ntohl(packet_buffer[next_seq_no % window_size].seq_no));
-
+          printf("++++++++++++++Pacchetto %d inviato++++++++++++++\n", ntohl(packet_buffer[next_seq_no % window_size].seq_no));
+          pkg_send++;
           // Se il next sequence number corrisponde con la base lancia il timer
           if (base == next_seq_no)
           {
@@ -227,9 +227,9 @@ void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool d
           {
             start_sample_RTT = clock();
           }
-          printf("Inviato pacchetto %d\n", ntohl(packet_buffer[next_seq_no % window_size].seq_no));
-
-          // Se il next sequence number corrisponde con la base lancia il timer
+          printf("++++++++++Inviato pacchetto %d++++++++++++++\n", ntohl(packet_buffer[next_seq_no % window_size].seq_no));
+          pkg_send++;
+          // Se il next  sequence number corrisponde con la base lancia il timer
           if (base == next_seq_no)
           {
             timer_sample = clock();
@@ -239,7 +239,7 @@ void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool d
           next_seq_no++;
         }
       }
-      pkg_send++;
+      
     }
 
     if (timeout(timer_sample, timer_enable, dyn_timer_enable, &timer, &trial_counter))
@@ -248,7 +248,7 @@ void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool d
       {
         timer_sample = clock();
         sendto(sockfd, &packet_buffer[i], sizeof(packet_buffer[i]), 0, (struct sockaddr *)&addr, sizeof(addr));
-        pkg_send++;
+        pkg_resend++;
         if (dyn_timer_enable)
         {
           start_sample_RTT = clock();
@@ -262,22 +262,23 @@ void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool d
     {
       if (!simulate_loss(loss_rate))
       {
-        printf("ACK %d ricevuto\n", ntohl(ack.seq_no));
         base = ntohl(ack.seq_no) + 1;
-
-        // Azzero il contatore di tentativi di ritrasmissione in quanto se ricevo ACK il client e' vivo
         trial_counter = 0;
-        // Stop del timer associato al pacchetto piu' vecchio della finestra
         if (dyn_timer_enable)
         { 
+            printf("++++++++++++++RICALCOLO TIMER++++++++++++++\n");
             sample_RTT = (double)(clock() - start_sample_RTT) * 1000 / CLOCKS_PER_SEC;
-            printf("SAMPLE RTT %f\n", sample_RTT);
+            printf("SAMPLE RTT = %f ", sample_RTT);
             estimated_RTT = (double)(0.875 * estimated_RTT) + (0.125 * sample_RTT);
-            printf("ESTIMATED RTT %f\n", estimated_RTT);
+            printf(" ESTIMATED RTT = %f ", estimated_RTT);
             dev_RTT = (double)(0.75 * dev_RTT) + (0.25 * fabs(sample_RTT - estimated_RTT));
-            printf("DEV RTT %f\n", dev_RTT);
+            printf(" DEV RTT = %f\n", dev_RTT);
             timer = (double)estimated_RTT + (4 * dev_RTT);        
-            printf("ACK %d ricevuto, ricalcolo timer = %f\n", ntohl(ack.seq_no), timer);
+            printf("++++++++++++++ACK %d ricevuto,  timer = %f ++++++++++++++\n", ntohl(ack.seq_no), timer);
+        
+        }
+        else{
+          printf("++++++++++++++ACK %d ricevuto++++++++++++++\n", ntohl(ack.seq_no));
         } 
         if (base == next_seq_no)
         {
@@ -322,7 +323,8 @@ input_termination:
     }
 
     if (timeout(timer_sample, timer_enable, dyn_timer_enable, &timer, &trial_counter))
-    {
+    { 
+      pkg_resend++;
       FIN_sended = false;
     }
 
@@ -335,8 +337,7 @@ input_termination:
         {
           printf("Ho ricevuto FIN ACK\n");
           break;
-        }
-        pkg_send++;
+        } 
       }
       else
       {
@@ -355,6 +356,7 @@ input_termination:
     closedir(d);
   }
   printf("Ho inviato %d pacchetti\n", pkg_send);
+  printf("Ho ritrasmesso %d pacchetti\n", pkg_resend);
   printf("Ho perso %d pacchetti.\n", pkg_loss);
   printf("chiudo socket\n");
   close(sockfd);
@@ -468,8 +470,8 @@ void download(int sockfd, struct data_packet data, struct sockaddr_in addr, floa
   {
     close(fd);
   }
-  printf("Ho RIcevuto %d pacchetti.\n", pkg_receive);
-  printf("Si sono Persi %d pacchetti\n", pkg_loss);
+  printf("Ho Ricevuto %d pacchetti.\n", pkg_receive);
+  printf("Ho Perso %d pacchetti\n", pkg_loss);
   close(sockfd);
 }
 
