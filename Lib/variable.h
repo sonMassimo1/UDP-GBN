@@ -18,7 +18,7 @@
 
 #define MAX_TRIALS_NO 10
 #define DEFAULT_TIMER 1000
-#define MAX_CHOICE_TIME 120
+#define MAX_CHOICE_TIME 60
 #define MTU 1024
 
 #define NORMAL 10

@@ -165,7 +165,7 @@ int main(int argc, char *argv[]){
 
   while(1){
     alarm(MAX_CHOICE_TIME);
-    printf("Cosa posso fare per te? Hai due minuti per scegliere.\n");
+    printf("Cosa posso fare per te? Hai un minuto per scegliere.\n");
     printf("1)PUT\n");
     printf("2)GET\n");
     printf("3)LIST\n");
