@@ -1,21 +1,5 @@
 #include "../Lib/variable.h"
 #include "../Lib/service.h"
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <unistd.h> 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <dirent.h> 
-#include <signal.h>
-#include <sys/wait.h>
-#include <stdbool.h>
-#include <sys/time.h>
-#include <time.h>
-#include <math.h>
 
 typedef void Sigfunc(int); 
 
@@ -30,10 +14,10 @@ int main(int argc, char *argv[]){
   struct sockaddr_in addr, child_addr;
   pid_t pid;
   struct sigaction sa;
-  struct segment_packet data;
+  struct data_packet data;
   struct ack_packet ack;
   float loss_rate;
-  double timer, synack_timer;
+  double timer;
   clock_t timer_sample; 
   bool dyn_timer_enable=false, timer_enable=false, SYNACK_sended=false;
   long conn_req_no;
@@ -46,7 +30,7 @@ int main(int argc, char *argv[]){
 
   //Controllo numero di argomenti
   if (argc < 5) { 
-    fprintf(stderr, "utilizzo: server <porta server> <dimensione finestra> <probabilita' perdita (float 0.x, -1 for 0)> <timeout (in ms double, -1 for dynamic timer)>\n");
+    fprintf(stderr, "utilizzo: server <porta server> <dimensione finestra> <probabilita' perdita> <timeout (in ms double, 0 for dynamic timer)>\n");
     exit(EXIT_FAILURE);
   }
 
@@ -57,32 +41,30 @@ int main(int argc, char *argv[]){
   }
 
   //Controllo dimensione finestra
-  if((window_size=atoi(argv[2]))==0){
+  if((window_size=atoi(argv[2]))<=0){
     fprintf(stderr,"inserisci dimensione finestra valida\n");
     exit(EXIT_FAILURE);
   }
 
+
+  loss_rate = atof(argv[3]);
   //Controllo probabilita' di perdita
-  if((loss_rate=atof(argv[3]))==0){
+	if((loss_rate < 0) || (loss_rate > 1)) {
       fprintf(stderr,"inserisci un loss rate valido\n");
       exit(EXIT_FAILURE);
   }
 
-  if(loss_rate==-1)
-    loss_rate=0;
-
   //Controllo timer
-  if((timer=atof(argv[4]))==0){
+  if((timer=atof(argv[4]))<0){
     fprintf(stderr,"inserisci un timer valido\n");
     exit(EXIT_FAILURE);
   }
 
-  if(timer<0){
-    synack_timer=DEFAULT_TIMER;
+  if(timer==0){
+    timer=DEFAULT_TIMER;
     dyn_timer_enable=true;
   }
-  else
-    synack_timer=timer;
+
 
   print_head();
 
@@ -135,10 +117,7 @@ int main(int argc, char *argv[]){
 
     if(ntohs(data.type)!=SYN)
       continue;
-    /*if(simulate_loss(loss_rate)){
-      printf("Perdita SYN simulata\n");
-      continue;
-    }*/
+
 
     conn_req_no=ntohl(data.seq_no);
 
@@ -195,23 +174,21 @@ int main(int argc, char *argv[]){
         printf("SYNACK inviato\n");
       }
 
-      if(timeout(timer_sample, timer_enable, dyn_timer_enable, &synack_timer, &trial_counter)){
+      if(timeout(timer_sample, timer_enable, dyn_timer_enable, &timer, &trial_counter)){
         SYNACK_sended=false;
         printf("Timeout SYNACK\n");
       }
 
       //Attendo ack syn ack
       if ((recvfrom(sockfd, &ack, sizeof(ack), MSG_DONTWAIT, (struct sockaddr *)&addr, &len)) > 0) {
-        //if(!simulate_loss(loss_rate)){
+        
           //Controllo che sia la richiesta corretta
           if((ntohl(ack.seq_no)==conn_req_no)&&(ntohs(ack.type)==SYN)){
             SYNACK_sended=false;
             printf("ACKSYNACK ricevuto\n");
             break;
           }
-        //}
-        //else
-          //printf("PERDITA ACKSYNACK SIMULATA\n");
+        
       }
       
     }
@@ -227,42 +204,28 @@ int main(int argc, char *argv[]){
           close(child_sockfd);
           exit(EXIT_FAILURE);
         }
-       
+        ack.type = data.type;
+        //ACK comando
+        if(sendto(child_sockfd, &ack, sizeof(ack), 0, (struct sockaddr *)&child_addr, sizeof(child_addr))<0){
+          perror("errore sendto ack comando");
+          exit(EXIT_FAILURE);
+        }
 
-          switch(ntohs(data.type)){
+        switch(ntohs(data.type)){
 
           case PUT:
-            alarm(0);
-            ack.type=htons(PUT);
-            //ACK comando
-            if(sendto(child_sockfd, &ack, sizeof(ack), 0, (struct sockaddr *)&child_addr, sizeof(child_addr))<0){
-              perror("errore sendto ack comando");
-              exit(EXIT_FAILURE);
-            }
+            alarm(0);            
             put_server(child_sockfd, child_addr, loss_rate, data.data);
             break;
 
           case GET:
-            alarm(0);
-            ack.type=htons(GET);
-            //ACK comando
-            if(sendto(child_sockfd, &ack, sizeof(ack), 0, (struct sockaddr *)&child_addr, sizeof(child_addr))<0){
-              perror("errore sendto ack comando");
-              exit(EXIT_FAILURE);
-            }
-            get_server(child_sockfd, child_addr, timer, window_size, loss_rate, data.data);
+            alarm(0);          
+            get_server(child_sockfd, child_addr, timer, window_size, loss_rate, data.data, dyn_timer_enable);
             break;
 
           case LIST:
             alarm(0);
-            ack.type=htons(LIST);
-
-            //ACK comando
-            if(sendto(child_sockfd, &ack, sizeof(ack), 0, (struct sockaddr *)&child_addr, sizeof(child_addr))<0){
-              perror("errore sendto ack comando");
-              exit(EXIT_FAILURE);
-            }
-            list_server(child_sockfd, child_addr, timer, window_size, loss_rate);
+            list_server(child_sockfd, child_addr, timer, window_size, loss_rate, dyn_timer_enable);
             break;
 
           default:
@@ -303,6 +266,8 @@ void sig_child_handler(int signum){
   int status;
   pid_t pid;
   while((pid = waitpid(WAIT_ANY, &status, WNOHANG)>0))
-    printf("Figlio %d terminato\n",pid);
+    printf("Client Disconnesso\n");
   return;
 }
+
+

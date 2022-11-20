@@ -1,19 +1,5 @@
 #include "../Lib/variable.h"
 #include "../Lib/service.h"
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <unistd.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <stdbool.h>
-#include <signal.h>
-#include <time.h>
-#include <sys/time.h>
-#include <math.h>
 
 void sig_alrm_handler(int signum);
 
@@ -21,11 +7,11 @@ int main(int argc, char *argv[]){
   int sockfd, n , serv_port, new_port, window_size, trial_counter=0;
   struct sockaddr_in servaddr, child_addr;
   struct sigaction sa;
-  struct segment_packet data;
+  struct data_packet data;
   struct ack_packet ack;
   long conn_req_no;
   float loss_rate;
-  double timer, syn_timer;
+  double timer;
   clock_t timer_sample; 
   bool dyn_timer_enable=false, timer_enable=false, SYN_sended=false;
 
@@ -37,7 +23,7 @@ int main(int argc, char *argv[]){
 
   //Controllo numero di argomenti
   if (argc < 6) { 
-    fprintf(stderr, "utilizzo: client <indirizzo IPv4 server> <porta server> <dimensione finestra> <probabilita' perdita (float 0.x, -1 for 0)> <timeout (in ms double, -1 for dynamic timer)>\n");
+    fprintf(stderr, "utilizzo: client <indirizzo IPv4 server> <porta server> <dimensione finestra> <probabilita' perdita> <timeout (in ms double, 0 for dynamic timer)>\n");
     exit(EXIT_FAILURE);
   }
 
@@ -53,27 +39,24 @@ int main(int argc, char *argv[]){
     exit(EXIT_FAILURE);
   }
 
+  loss_rate = atof(argv[4]);
   //Controllo probabilita' di perdita
-  if((loss_rate=atof(argv[4]))==0){
+	if((loss_rate < 0) || (loss_rate > 1)) {
       fprintf(stderr,"inserisci un loss rate valido\n");
       exit(EXIT_FAILURE);
   }
 
-  if(loss_rate==-1)
-    loss_rate=0;
-
   //Controllo timer
-  if((timer=atof(argv[5]))==0){
+  if((timer=atof(argv[5]))<0){
     fprintf(stderr,"inserisci un timer valido(non é valido 0)\n");
     exit(EXIT_FAILURE);
   }
 
-  if(timer<0){
-    syn_timer=DEFAULT_TIMER;
+  if(timer==0){
+    timer=DEFAULT_TIMER;
     dyn_timer_enable=true;
   }
-  else
-    syn_timer=timer;
+ 
 
 
   print_head();
@@ -139,24 +122,17 @@ int main(int argc, char *argv[]){
       printf("SYN inviato\n");
     }
 
-    if(timeout(timer_sample, timer_enable, dyn_timer_enable, &syn_timer, &trial_counter)){
+    if(timeout(timer_sample, timer_enable, dyn_timer_enable, &timer, &trial_counter)){
       SYN_sended=false;
-      printf("Timeout SYN\n");
     }
 
     //Attendo SYNACK
     if(recv(sockfd, &data, sizeof(data), MSG_DONTWAIT)>0){
-      //if(!simulate_loss(loss_rate)){
-
-         //Se l'identificatore non e' corretto il SYNACK non e' per me
-        if((ntohl(data.seq_no)==conn_req_no)&&(ntohs(data.type)==SYN)){
+      if((ntohl(data.seq_no)==conn_req_no)&&(ntohs(data.type)==SYN)){
           printf("Ricevuto SYNACK\n");
           timer_enable=false;
           break;
-        }
-      //}
-      //else
-        //printf("PERDITA SYNACK SIMULATA\n");
+      }
     }
   }
 
@@ -204,16 +180,16 @@ int main(int argc, char *argv[]){
     switch(n){
       case PUT:
         alarm(0);
-        put_client(sockfd, child_addr, timer, window_size, loss_rate);
+        put_client(sockfd, child_addr, timer, window_size, loss_rate, dyn_timer_enable);
         //put(sockfd);
         break;
       case GET:
         alarm(0);
-        get_client(sockfd, servaddr, timer, loss_rate);
+        get_client(sockfd, servaddr, timer, loss_rate, dyn_timer_enable);
         break;
       case LIST:
         alarm(0);
-        list_client(sockfd, servaddr, timer, loss_rate);
+        list_client(sockfd, servaddr, timer, loss_rate, dyn_timer_enable);
         break;
       default:
         printf("Inserisci un numero valido\n");

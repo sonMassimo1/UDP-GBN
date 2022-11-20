@@ -1,21 +1,3 @@
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <unistd.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <stdbool.h>
-#include <dirent.h>
-#include <sys/wait.h>
-#include <stdbool.h>
-#include <signal.h>
-#include <time.h>
-#include <sys/time.h>
-#include <math.h>
-
 
 void print_head()
 {
@@ -30,7 +12,7 @@ void print_head()
   printf("   `YbodP'    o888bood8P'   o888o                 `Y8bood8P'   o888bood8P'  o8o        `8  \n");
   printf("########################################################################################## \n");
   printf("\n");
-  printf("                                                         Creato da Massimo Mazzetti 0253467\n\n");
+  printf("                                                                 Massimo Mazzetti 0253467\n\n");
 }
 
 
@@ -40,7 +22,6 @@ void print_head()
 bool simulate_loss(float loss_rate)
 {
   double value;     // random value computed
-  bool res = false; // result simulate_loss
 
   // setting srand seed randomly
   struct timespec tms;
@@ -67,12 +48,12 @@ bool simulate_loss(float loss_rate)
   unsigned short vec[3] = {r1, r2, r3};
   seed48(vec);
   value = drand48(); // generate a float pseudo random value in [0.0, 1.0)
-  // printf("\nvalue: %f\n", value);
 
   // loss condition checking
-  if (value < loss_rate)
-    res = true;
-  return res;
+  if (value < loss_rate){
+    return true;
+  }
+  return false;
 }
 
 /// timeout 
@@ -116,23 +97,24 @@ bool timeout(clock_t timer_sample, bool timer_enable, bool dyn_timer_enable, dou
 /// @param timer 
 /// @param window_size 
 /// @param loss_rate 
-void upload(int sockfd, int type, struct sockaddr_in addr, struct segment_packet data, bool dyn_timer_enable, double timer, int window_size, float loss_rate)
+void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool dyn_timer_enable, double timer, int window_size, float loss_rate)
 {
   DIR *d;
   struct dirent *dir;
-  struct segment_packet *packet_buffer;
+  struct data_packet *packet_buffer;
   struct ack_packet ack;
   clock_t start_sample_RTT;
   double sample_RTT = 0, estimated_RTT = 0, dev_RTT = 0;
   int trial_counter = 0, len = sizeof(addr), fd;
-  bool RTT_sample_enable = false, FIN_sended = false, timer_enable = false;
+  bool FIN_sended = false, timer_enable = false;
   long base = 0, next_seq_no = 0;
   clock_t timer_sample = clock();
   long file_size = 0, num_of_files = 0;
   off_t head;
+  int type= data.type;
 
   // Alloco il buffer della finestra
-  if ((packet_buffer = malloc(window_size * sizeof(struct segment_packet))) == NULL)
+  if ((packet_buffer = malloc(window_size * sizeof(struct data_packet))) == NULL)
   {
     perror("malloc fallita");
     data.length = htons(strlen("Put fallita: errore interno del client"));
@@ -186,6 +168,7 @@ void upload(int sockfd, int type, struct sockaddr_in addr, struct segment_packet
   memset((void *)packet_buffer, 0, sizeof(packet_buffer));
   memset((void *)&data, 0, sizeof(data));
   memset((void *)&ack, 0, sizeof(ack));
+  ack.seq_no = htonl(-1);
 
   // Invio dati
   while (((ntohl(ack.seq_no) + 1) * MTU < file_size) || ((ntohl(ack.seq_no) + 1) < num_of_files))
@@ -210,10 +193,9 @@ void upload(int sockfd, int type, struct sockaddr_in addr, struct segment_packet
           packet_buffer[next_seq_no % window_size].type = htons(NORMAL);
           sendto(sockfd, &packet_buffer[next_seq_no % window_size], sizeof(packet_buffer[next_seq_no % window_size]), 0, (struct sockaddr *)&addr, sizeof(addr));
           // Se e' attivato il timer dinamico campiono per calcolare l'rtt
-          if ((dyn_timer_enable) && (!RTT_sample_enable))
+          if (dyn_timer_enable) 
           {
             start_sample_RTT = clock();
-            RTT_sample_enable = true;
           }
           printf("Inviato pacchetto %d\n", ntohl(packet_buffer[next_seq_no % window_size].seq_no));
 
@@ -240,10 +222,9 @@ void upload(int sockfd, int type, struct sockaddr_in addr, struct segment_packet
           sendto(sockfd, &packet_buffer[next_seq_no % window_size], sizeof(packet_buffer[next_seq_no % window_size]), 0, (struct sockaddr *)&addr, sizeof(addr));
 
           // Se e' attivato il timer dinamico campiono per calcolare l'rtt
-          if ((dyn_timer_enable) && (!RTT_sample_enable))
+          if (dyn_timer_enable)
           {
             start_sample_RTT = clock();
-            RTT_sample_enable = true;
           }
           printf("Inviato pacchetto %d\n", ntohl(packet_buffer[next_seq_no % window_size].seq_no));
 
@@ -261,16 +242,14 @@ void upload(int sockfd, int type, struct sockaddr_in addr, struct segment_packet
 
     if (timeout(timer_sample, timer_enable, dyn_timer_enable, &timer, &trial_counter))
     {
-      printf("timer = %f\n", timer);
       for (int i = 0; i < window_size; i++)
       {
         timer_sample = clock();
         sendto(sockfd, &packet_buffer[i], sizeof(packet_buffer[i]), 0, (struct sockaddr *)&addr, sizeof(addr));
 
-        if ((dyn_timer_enable) && (!RTT_sample_enable))
+        if (dyn_timer_enable)
         {
           start_sample_RTT = clock();
-          RTT_sample_enable = true;
         }
         printf("Pacchetto %d ritrasmesso\n", ntohl(packet_buffer[i].seq_no));
       }
@@ -287,9 +266,8 @@ void upload(int sockfd, int type, struct sockaddr_in addr, struct segment_packet
         // Azzero il contatore di tentativi di ritrasmissione in quanto se ricevo ACK il client e' vivo
         trial_counter = 0;
         // Stop del timer associato al pacchetto piu' vecchio della finestra
-        if ((dyn_timer_enable) && (RTT_sample_enable))
+        if (dyn_timer_enable)
         { 
-            RTT_sample_enable = false;
             sample_RTT = (double)(clock() - start_sample_RTT) * 1000 / CLOCKS_PER_SEC;
             printf("SAMPLE RTT %f\n", sample_RTT);
             estimated_RTT = (double)(0.875 * estimated_RTT) + (0.125 * sample_RTT);
@@ -302,11 +280,8 @@ void upload(int sockfd, int type, struct sockaddr_in addr, struct segment_packet
         if (base == next_seq_no)
         {
           timer_enable = false;
-          // printf("Ho fermato il timer\n");
         }
       }
-      else
-        printf("PERDITA ACK SIMULATA\n");
     }
   }
   // Pulizia
@@ -357,8 +332,6 @@ input_termination:
           break;
         }
       }
-      else
-        printf("PERDITA FINACK SIMULATA\n");
     }
   }
   if (type != LIST)
@@ -382,11 +355,13 @@ input_termination:
 /// @param addr 
 /// @param loss_rate 
 /// @param rm_string 
-void download(int sockfd, int type, struct segment_packet data, struct sockaddr_in addr, float loss_rate, char *rm_string)
+void download(int sockfd, struct data_packet data, struct sockaddr_in addr, float loss_rate, char *rm_string)
 {
   int fd, trial_counter = 0, len = sizeof(addr), n;
   struct ack_packet ack;
   long expected_seq_no = 0;
+  int type = data.type;
+
 
   if (type != LIST)
   {
@@ -456,8 +431,7 @@ void download(int sockfd, int type, struct segment_packet data, struct sockaddr_
               perror("Non ho scritto tutto su file mi riposiziono\n");
               lseek(fd, 0, SEEK_CUR - n);
               continue;
-            }
-            // printf("Ho scritto %d byte sul file\n",n);
+            }          
           }
           ack.type = htons(NORMAL);
           ack.seq_no = data.seq_no;
@@ -466,16 +440,17 @@ void download(int sockfd, int type, struct segment_packet data, struct sockaddr_
       }
       // Invio ack
       sendto(sockfd, &ack, sizeof(ack), 0, (struct sockaddr *)&addr, sizeof(addr));
-      printf("ACK %d inviato\n", ntohl(ack.seq_no));
+      //printf("ACK %d inviato\n", ntohl(ack.seq_no));
     }
-    else
-      printf("PERDITA PACCHETTO SIMULATA\n");
   }
 
   // Invio FINACK
   sendto(sockfd, &ack, sizeof(ack), 0, (struct sockaddr *)&addr, sizeof(addr));
   printf("FIN ACK inviato\n");
-  close(fd);
+  if (type != LIST)
+  {
+    close(fd);
+  }
   close(sockfd);
 }
 
@@ -486,7 +461,7 @@ void download(int sockfd, int type, struct segment_packet data, struct sockaddr_
 /// @param timer 
 /// @param dyn_timer_enable 
 /// @return 
-bool send_request(int sockfd, int type, struct segment_packet data, double timer, bool dyn_timer_enable)
+bool send_request(int sockfd, int type, struct data_packet data, double timer, bool dyn_timer_enable, float loss_rate)
 {
   int trial_counter = 0;
   bool command_sended = false, timer_enable = false;
@@ -529,16 +504,12 @@ bool send_request(int sockfd, int type, struct segment_packet data, double timer
     // Attendo ACK richiesta
     if (recv(sockfd, &ack, sizeof(ack), MSG_DONTWAIT) > 0)
     {
-      // if(!simulate_loss(loss_rate)){
       if (ntohs(ack.type) == type)
       {
         printf("Ricevuto ack richesta\n");
         timer_enable = false;
         break;
       }
-      //}
-      // else
-      // printf("PERDITA ACK COMANDO SIMULATA\n");
     }
   }
   return true;
@@ -549,22 +520,14 @@ bool send_request(int sockfd, int type, struct segment_packet data, double timer
 /// @param servaddr 
 /// @param timer 
 /// @param loss_rate 
-void get_client(int sockfd, struct sockaddr_in servaddr, double timer, float loss_rate)
+void get_client(int sockfd, struct sockaddr_in servaddr, double timer, float loss_rate,  bool dyn_timer_enable)
 {
-  struct segment_packet data;
+  struct data_packet data;
   char *rm_string;
-  bool dyn_timer_enable = false;
   struct timeval start, end;
   char file_name[256];
 
   memset((void *)&data, 0, sizeof(data));
-
-  // Attivo timer dinamico
-  if (timer < 0)
-  {
-    dyn_timer_enable = true;
-    timer = DEFAULT_TIMER;
-  }
 
 // Scelta del file da scaricare dal server
 file_choice:
@@ -589,14 +552,14 @@ file_choice:
 
   sprintf(data.data, "./files/%s", file_name);
 
-  if (!send_request(sockfd, GET, data, timer, dyn_timer_enable))
+  if (!send_request(sockfd, GET, data, timer, dyn_timer_enable, loss_rate))
   {
     exit(EXIT_FAILURE);
   }
   
   
-
-  download(sockfd, GET, data, servaddr, loss_rate, rm_string);
+  data.type = GET;
+  download(sockfd, data, servaddr, loss_rate, rm_string);
   printf("\nGET terminata\n\n");
 
   gettimeofday(&end, NULL);
@@ -614,21 +577,13 @@ file_choice:
 /// @param servaddr 
 /// @param timer 
 /// @param loss_rate 
-void list_client(int sockfd, struct sockaddr_in servaddr, double timer, float loss_rate)
+void list_client(int sockfd, struct sockaddr_in servaddr, double timer, float loss_rate,  bool dyn_timer_enable)
 {
-  struct segment_packet data;
+  struct data_packet data;
   char *rm_string;
-  bool dyn_timer_enable = false;
   struct timeval start, end;
 
   memset((void *)&data, 0, sizeof(data));
-
-  // Attivo timer dinamico
-  if (timer < 0)
-  {
-    dyn_timer_enable = true;
-    timer = DEFAULT_TIMER;
-  }
 
   // Utile solo per la pulizia della directory in caso di errori
   rm_string = malloc(strlen(data.data) + 3);
@@ -636,7 +591,7 @@ void list_client(int sockfd, struct sockaddr_in servaddr, double timer, float lo
 
   gettimeofday(&start, NULL);
 
-  if (!send_request(sockfd, LIST, data, timer, dyn_timer_enable))
+  if (!send_request(sockfd, LIST, data, timer, dyn_timer_enable, loss_rate))
   {
     exit(EXIT_FAILURE);
   }
@@ -645,7 +600,9 @@ void list_client(int sockfd, struct sockaddr_in servaddr, double timer, float lo
 
   printf("Lista dei file su server:\n\n");
 
-  download(sockfd, LIST, data, servaddr, loss_rate, rm_string);
+  data.type = LIST;
+
+  download(sockfd, data, servaddr, loss_rate, rm_string);
 
   printf("\nLIST terminata\n\n");
 
@@ -665,18 +622,11 @@ void list_client(int sockfd, struct sockaddr_in servaddr, double timer, float lo
 /// @param timer 
 /// @param window_size 
 /// @param loss_rate 
-void put_client(int sockfd, struct sockaddr_in servaddr, double timer, int window_size, float loss_rate)
+void put_client(int sockfd, struct sockaddr_in servaddr, double timer, int window_size, float loss_rate, bool dyn_timer_enable)
 {
-  struct segment_packet data;
-  bool dyn_timer_enable = false;
+  struct data_packet data;
   struct timeval start, end;
   char file_name[256];
-  // Attivo timer dinamico
-  if (timer < 0)
-  {
-    dyn_timer_enable = true;
-    timer = DEFAULT_TIMER;
-  }
   memset((void *)&data, 0, sizeof(data));
 
 // Scelta del file da caricare su server
@@ -696,12 +646,13 @@ file_choice:
 
   sprintf(data.data, "./files/%s", file_name);
 
-  if (!send_request(sockfd, PUT, data, timer, dyn_timer_enable))
+  if (!send_request(sockfd, PUT, data, timer, dyn_timer_enable, loss_rate))
   {
     exit(EXIT_FAILURE);
   }
 
-  upload(sockfd, PUT, servaddr, data, dyn_timer_enable, timer, window_size, loss_rate);
+  data.type= PUT;
+  upload(sockfd, servaddr, data, dyn_timer_enable, timer, window_size, loss_rate);
   printf("PUT terminata\n");
 
   gettimeofday(&end, NULL);
@@ -721,22 +672,16 @@ file_choice:
 /// @param window_size 
 /// @param loss_rate 
 /// @param file_name 
-void get_server(int sockfd, struct sockaddr_in addr, double timer, int window_size, float loss_rate, char *file_name)
+void get_server(int sockfd, struct sockaddr_in addr, double timer, int window_size, float loss_rate, char *file_name, bool dyn_timer_enable)
 {
-  struct segment_packet data;
-  bool dyn_timer_enable = false;
-  // Attivo timer dinamico
-  if (timer < 0)
-  {
-    dyn_timer_enable = true;
-    timer = DEFAULT_TIMER;
-  }
+  struct data_packet data;
 
   memset((void *)&data, 0, sizeof(data));
 
 
   sprintf(data.data, "%s", file_name);
-  upload(sockfd, GET, addr, data, dyn_timer_enable, timer, window_size, loss_rate);
+  data.type = GET;
+  upload(sockfd, addr, data, dyn_timer_enable, timer, window_size, loss_rate);
   printf("\nGet terminata\n");
   exit(EXIT_SUCCESS);
 }
@@ -748,7 +693,7 @@ void get_server(int sockfd, struct sockaddr_in addr, double timer, int window_si
 /// @param file_name 
 void put_server(int sockfd, struct sockaddr_in addr, float loss_rate, char *file_name)
 {
-  struct segment_packet data;
+  struct data_packet data;
   char *rm_string;
   // Pulizia
   memset((void *)&data, 0, sizeof(data));
@@ -757,7 +702,8 @@ void put_server(int sockfd, struct sockaddr_in addr, float loss_rate, char *file
   rm_string = malloc(strlen(data.data) + 3);
   sprintf(rm_string, "rm %s", data.data);
   sprintf(data.data, "%s", file_name);
-  download(sockfd, PUT, data, addr, loss_rate, rm_string);
+  data.type= PUT;
+  download(sockfd, data, addr, loss_rate, rm_string);
   close(sockfd);
   printf("\nPut terminata\n\n");
   exit(EXIT_SUCCESS);
@@ -769,19 +715,14 @@ void put_server(int sockfd, struct sockaddr_in addr, float loss_rate, char *file
 /// @param timer 
 /// @param window_size 
 /// @param loss_rate 
-void list_server(int sockfd, struct sockaddr_in addr, double timer, int window_size, float loss_rate)
+void list_server(int sockfd, struct sockaddr_in addr, double timer, int window_size, float loss_rate, bool dyn_timer_enable )
 {
-
-  struct segment_packet data;
-  bool dyn_timer_enable = false;
-  // Attivo timer dinamico
-  if (timer < 0)
-  {
-    dyn_timer_enable = true;
-    timer = DEFAULT_TIMER;
-  }
-
-  upload(sockfd, LIST, addr, data, dyn_timer_enable, timer, window_size, loss_rate);
+  struct data_packet data;
+  data.type = LIST;
+  upload(sockfd, addr, data, dyn_timer_enable, timer, window_size, loss_rate);
   printf("List terminata\n");
   exit(EXIT_SUCCESS);
 }
+
+
+///Cambiare simulate loss da recv a send
