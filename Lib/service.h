@@ -112,6 +112,7 @@ void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool d
   long file_size = 0, num_of_files = 0;
   off_t head;
   int type= data.type;
+  int pkg_send =0, pkg_loss =0;
 
   // Alloco il buffer della finestra
   if ((packet_buffer = malloc(window_size * sizeof(struct data_packet))) == NULL)
@@ -238,6 +239,7 @@ void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool d
           next_seq_no++;
         }
       }
+      pkg_send++;
     }
 
     if (timeout(timer_sample, timer_enable, dyn_timer_enable, &timer, &trial_counter))
@@ -246,7 +248,7 @@ void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool d
       {
         timer_sample = clock();
         sendto(sockfd, &packet_buffer[i], sizeof(packet_buffer[i]), 0, (struct sockaddr *)&addr, sizeof(addr));
-
+        pkg_send++;
         if (dyn_timer_enable)
         {
           start_sample_RTT = clock();
@@ -281,6 +283,9 @@ void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool d
         {
           timer_enable = false;
         }
+      }
+      else{
+        pkg_loss++;
       }
     }
   }
@@ -331,6 +336,11 @@ input_termination:
           printf("Ho ricevuto FIN ACK\n");
           break;
         }
+        pkg_send++;
+      }
+      else
+      {
+        pkg_loss++;
       }
     }
   }
@@ -344,6 +354,8 @@ input_termination:
     printf("chiudo cartella\n");
     closedir(d);
   }
+  printf("Ho inviato %d pacchetti\n", pkg_send);
+  printf("Ho perso %d pacchetti.\n", pkg_loss);
   printf("chiudo socket\n");
   close(sockfd);
 }
@@ -360,6 +372,7 @@ void download(int sockfd, struct data_packet data, struct sockaddr_in addr, floa
   int fd, trial_counter = 0, len = sizeof(addr), n;
   struct ack_packet ack;
   long expected_seq_no = 0;
+  int pkg_loss = 0, pkg_receive=0;
   int type = data.type;
 
 
@@ -418,6 +431,7 @@ void download(int sockfd, struct data_packet data, struct sockaddr_in addr, floa
         }
         else
         {
+          pkg_receive++;
           if (type == LIST)
           {
             printf("%s\n", data.data);
@@ -442,6 +456,9 @@ void download(int sockfd, struct data_packet data, struct sockaddr_in addr, floa
       sendto(sockfd, &ack, sizeof(ack), 0, (struct sockaddr *)&addr, sizeof(addr));
       //printf("ACK %d inviato\n", ntohl(ack.seq_no));
     }
+    else{
+      pkg_loss++;
+    }
   }
 
   // Invio FINACK
@@ -451,6 +468,8 @@ void download(int sockfd, struct data_packet data, struct sockaddr_in addr, floa
   {
     close(fd);
   }
+  printf("Ho RIcevuto %d pacchetti.\n", pkg_receive);
+  printf("Si sono Persi %d pacchetti\n", pkg_loss);
   close(sockfd);
 }
 
