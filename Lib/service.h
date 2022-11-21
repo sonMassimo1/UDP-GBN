@@ -102,7 +102,7 @@ void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool d
   DIR *d;
   struct dirent *dir;
   struct data_packet *packet_buffer;
-  struct ack_packet ack;
+  struct data_packet ack;
   clock_t start_sample_RTT;
   double sample_RTT = 0, estimated_RTT = 0, dev_RTT = 0;
   int trial_counter = 0, len = sizeof(addr), fd;
@@ -258,7 +258,7 @@ void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool d
     }
 
     // Controllo se ci sono ack
-    if (recvfrom(sockfd, &ack, sizeof(struct ack_packet), MSG_DONTWAIT, (struct sockaddr *)&addr, &len) > 0)
+    if (recvfrom(sockfd, &ack, sizeof(struct data_packet), MSG_DONTWAIT, (struct sockaddr *)&addr, &len) > 0)
     {
       if (!simulate_loss(loss_rate))
       {
@@ -372,7 +372,7 @@ input_termination:
 void download(int sockfd, struct data_packet data, struct sockaddr_in addr, float loss_rate, char *rm_string)
 {
   int fd, trial_counter = 0, len = sizeof(addr), n;
-  struct ack_packet ack;
+  struct data_packet ack;
   long expected_seq_no = 0;
   int pkg_loss = 0, pkg_receive=0;
   int type = data.type;
@@ -486,7 +486,7 @@ bool send_request(int sockfd, int type, struct data_packet data, double timer, b
 {
   int trial_counter = 0;
   bool command_sended = false, timer_enable = false;
-  struct ack_packet ack;
+  struct data_packet ack;
   clock_t timer_sample;
 
   // Invio richiesta

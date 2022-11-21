@@ -37,7 +37,3 @@ struct data_packet {
     char data[MTU];
 };
 
-struct ack_packet {
-    int type;
-    long seq_no;
-};

@@ -8,7 +8,7 @@ int main(int argc, char *argv[]){
   struct sockaddr_in servaddr, child_addr;
   struct sigaction sa;
   struct data_packet data;
-  struct ack_packet ack;
+  struct data_packet ack;
   long conn_req_no;
   float loss_rate;
   double timer;

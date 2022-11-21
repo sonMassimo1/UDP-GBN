@@ -15,7 +15,7 @@ int main(int argc, char *argv[]){
   pid_t pid;
   struct sigaction sa;
   struct data_packet data;
-  struct ack_packet ack;
+  struct data_packet ack;
   float loss_rate;
   double timer;
   clock_t timer_sample; 
