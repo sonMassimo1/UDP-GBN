@@ -21,13 +21,11 @@ void print_head()
 /// @return 
 bool simulate_loss(float loss_rate)
 {
-  double value;     // random value computed
-
-  // setting srand seed randomly
+  double value;   
   struct timespec tms;
   if (clock_gettime(CLOCK_REALTIME, &tms))
   {
-    srand(time(NULL)); // if not work use default time(NULL) that return seconds precision (dd/mm/YY - hh:mm:ss)
+    srand(time(NULL)); 
   }
   else
   {
@@ -38,18 +36,16 @@ bool simulate_loss(float loss_rate)
       ++micros;
     }
     srand(micros);
-    // printf("Microseconds: %"PRId64"\n",micros);
   }
 
-  // generate random vector for seed48
+
   int r1 = rand() % 100;
   int r2 = rand() % 100;
   int r3 = rand() % 100;
   unsigned short vec[3] = {r1, r2, r3};
   seed48(vec);
-  value = drand48(); // generate a float pseudo random value in [0.0, 1.0)
+  value = drand48(); 
 
-  // loss condition checking
   if (value < loss_rate){
     return true;
   }
