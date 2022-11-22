@@ -16,7 +16,7 @@
 #include <sys/time.h>
 #include <math.h>
 
-#define MAX_TRIALS_NO 10
+#define MAX_TRIALS_NO 20
 #define DEFAULT_TIMER 1000
 #define MAX_CHOICE_TIME 60
 #define MTU 1024

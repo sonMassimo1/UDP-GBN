@@ -23,7 +23,7 @@ int main(int argc, char *argv[]){
 
   //Controllo numero di argomenti
   if (argc < 6) { 
-    fprintf(stderr, "utilizzo: client <indirizzo IPv4 server> <porta server> <dimensione finestra> <probabilita' perdita> <timeout (in ms double, 0 for dynamic timer)>\n");
+    fprintf(stderr, "./client <indirizzo IPv4 server> <porta server> <dimensione finestra> <probabilita' perdita> <timeout (in ms double, 0 per timer dinamico)>\n");
     exit(EXIT_FAILURE);
   }
 

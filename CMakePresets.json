@@ -1,0 +1,39 @@
+{
+    "version": 3, 
+    "cmakeMinimumRequired": {
+      "major": 3,  
+      "minor": 21,  
+      "patch": 0  
+    },
+    "configurePresets": [
+      {
+        "name": "linux-default",
+        "hidden": true,
+        "generator": "Unix Makefiles",
+        "binaryDir": "${sourceDir}/out/build/${presetName}",
+        "architecture": {
+          "value": "x64",
+          "strategy": "external"
+        },
+        "condition": {
+          "type": "equals",
+          "lhs": "${hostSystemName}",
+          "rhs": "Linux"
+        },
+        "vendor": {
+          "jetbrains.com/clion": {
+            "toolchain": "WSL"
+          }
+        }
+      },
+      {
+        "name": "linux-debug",
+        "displayName": "x64 Debug",
+        "inherits": "linux-default",
+        "cacheVariables": {
+          "CMAKE_BUILD_TYPE": "Debug",
+          "CMAKE_C_FLAGS_DEBUG": "-std=c17 -Wall -Wextra -pedantic -g3 -D_DEBUG"
+        }
+      }
+    ]
+}

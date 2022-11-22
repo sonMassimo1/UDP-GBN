@@ -1,7 +1,8 @@
-
 void print_head()
 {
-  system("clear");
+  if(system("clear") == -1){
+    printf("errore system\n");
+  };
   printf("########################################################################################## \n");
   printf("ooooo     ooo oooooooooo.   ooooooooo.             .oooooo.    oooooooooo.  ooooo      ooo \n");
   printf("`888'     `8' `888'   `Y8b  `888   `Y88.          d8P'  `Y8b   `888'   `Y8b `888b.     `8' \n");
@@ -14,7 +15,6 @@ void print_head()
   printf("\n");
   printf("                                                                 Massimo Mazzetti 0253467\n\n");
 }
-
 
 /// simulate_loss 
 /// @param loss_rate 
@@ -384,6 +384,9 @@ void download(int sockfd, struct data_packet data, struct sockaddr_in addr, floa
     if ((fd = open(data.data, O_RDWR | O_CREAT | O_TRUNC, 0666)) < 0)
     {
       perror("errore apertura/creazione file da ricevere");
+      if(system(rm_string) == -1){
+        printf("errore system\n");
+      };
       exit(EXIT_FAILURE);
     }
   }
@@ -421,7 +424,9 @@ void download(int sockfd, struct data_packet data, struct sockaddr_in addr, floa
           if (ntohs(data.length) > 0)
           {
             printf("%s\n", data.data);
-            system(rm_string);
+            if(system(rm_string) == -1){
+              printf("errore system\n");
+            };
           }
           else
           {
@@ -566,12 +571,14 @@ file_choice:
   printf("E' stato scelto %s \n", data.data);
 
   // Utile solo per la pulizia della directory in caso di errori
-  rm_string = malloc(strlen(data.data) + 3);
-  sprintf(rm_string, "rm %s", data.data);
 
   gettimeofday(&start, NULL);
 
   sprintf(data.data, "./files/%s", file_name);
+
+  rm_string = malloc(strlen(data.data) + 3);
+  sprintf(rm_string, "rm %s", data.data);
+
 
   if (!send_request(sockfd, GET, data, timer, dyn_timer_enable, loss_rate))
   {
@@ -721,8 +728,8 @@ void put_server(int sockfd, struct sockaddr_in addr, float loss_rate, char *file
 
   // Utile solo per la pulizia della directory in caso di errori
   rm_string = malloc(strlen(data.data) + 3);
-  sprintf(rm_string, "rm %s", data.data);
   sprintf(data.data, "%s", file_name);
+  sprintf(rm_string, "rm %s", data.data);
   data.type= PUT;
   download(sockfd, data, addr, loss_rate, rm_string);
   close(sockfd);
@@ -744,6 +751,3 @@ void list_server(int sockfd, struct sockaddr_in addr, double timer, int window_s
   printf("List terminata\n");
   exit(EXIT_SUCCESS);
 }
-
-
-///Cambiare simulate loss da recv a send
