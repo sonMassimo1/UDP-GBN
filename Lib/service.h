@@ -16,9 +16,6 @@ void print_head()
   printf("                                                                 Massimo Mazzetti 0253467\n\n");
 }
 
-/// simulate_loss 
-/// @param loss_rate 
-/// @return 
 bool simulate_loss(float loss_rate)
 {
   double value;   
@@ -52,13 +49,6 @@ bool simulate_loss(float loss_rate)
   return false;
 }
 
-/// timeout 
-/// @param timer_sample 
-/// @param timer_enable 
-/// @param dyn_timer_enable 
-/// @param timer 
-/// @param trial_counter 
-/// @return 
 bool timeout(clock_t timer_sample, bool timer_enable, bool dyn_timer_enable, double *timer, int *trial_counter)
 { 
   bool timeout = (( (double) ( (clock() - timer_sample) *1000 )/ CLOCKS_PER_SEC) > (*timer));
@@ -69,11 +59,11 @@ bool timeout(clock_t timer_sample, bool timer_enable, bool dyn_timer_enable, dou
     {
       if ( 2 * (*timer) > 10000 )
       {
-        *timer = DEFAULT_TIMER; // timer troppo elevato provo a "sbloccare" il canale (forzandolo) e limitare l'attesa
+        *timer = DEFAULT_TIMER; 
       }
       else
       {
-        *timer = 2 * (*timer); // quando entro in ritrasmissione raddoppio il valore del timer per cautela
+        *timer = 2 * (*timer);
       }
     }
     *trial_counter = *trial_counter + 1;
@@ -84,15 +74,6 @@ bool timeout(clock_t timer_sample, bool timer_enable, bool dyn_timer_enable, dou
   return false;
 }
 
-/// upload
-/// @param sockfd 
-/// @param type 
-/// @param addr 
-/// @param data 
-/// @param dyn_timer_enable 
-/// @param timer 
-/// @param window_size 
-/// @param loss_rate 
 void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool dyn_timer_enable, double timer, int window_size, float loss_rate)
 {
   DIR *d;
@@ -110,7 +91,6 @@ void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool d
   int type= data.type;
   int pkg_send =0, pkg_loss =0, pkg_resend = 0;
 
-  // Alloco il buffer della finestra
   if ((packet_buffer = malloc(window_size * sizeof(struct data_packet))) == NULL)
   {
     perror("malloc fallita");
@@ -122,7 +102,6 @@ void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool d
 
   if (type != LIST)
   {
-    // Apro il file
     if ((fd = open(data.data, O_RDONLY)) < 0)
     {
       perror("errore apertura file da inviare");
@@ -130,7 +109,6 @@ void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool d
       strcpy(data.data, "Get fallita: file non presente");
       goto input_termination;
     }
-    // Calcolo dimensione file
     lseek(fd, 0, SEEK_SET);
     file_size = lseek(fd, 0, SEEK_END);
     lseek(fd, 0, SEEK_SET);
@@ -139,7 +117,6 @@ void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool d
   }
   else
   {
-    // Apro la directory contente i file
     if ((d = opendir("./files")) == NULL)
     {
       perror("errore apertura directory dei file");
@@ -147,31 +124,23 @@ void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool d
       strcpy(data.data, "List fallita: errore interno del server");
       goto input_termination;
     }
-    // Tengo traccia della testa della directory
     head = telldir(d);
-    // Conto quanti pacchetti dovro' inviare
     while ((dir = readdir(d)) != NULL)
     {
       if ((strcmp(dir->d_name, ".") == 0) || (strcmp(dir->d_name, "..") == 0))
         continue;
       num_of_files++;
     }
-    // printf("numero di file %ld\n",num_of_files);
-
-    // Mi riposiziono
     seekdir(d, head);
   }
-  // Pulizia
   memset((void *)packet_buffer, 0, sizeof(packet_buffer));
   memset((void *)&data, 0, sizeof(data));
   memset((void *)&ack, 0, sizeof(ack));
   ack.seq_no = htonl(-1);
 
-  // Invio dati
   while (((ntohl(ack.seq_no) + 1) * MTU < file_size) || ((ntohl(ack.seq_no) + 1) < num_of_files))
   {
 
-    // Se ci sono troppe ritrasmissioni lascio stare
     if (trial_counter >= MAX_TRIALS_NO)
     {
       printf("il canale e' molto disturbato\n");
@@ -179,7 +148,6 @@ void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool d
       exit(EXIT_FAILURE);
     }
 
-    // Se la finestra non e' piena preparo ed invio il pacchetto
     if (next_seq_no < base + window_size)
     {
       if (type != LIST)
@@ -189,7 +157,6 @@ void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool d
           packet_buffer[next_seq_no % window_size].seq_no = htonl(next_seq_no);
           packet_buffer[next_seq_no % window_size].type = htons(NORMAL);
           sendto(sockfd, &packet_buffer[next_seq_no % window_size], sizeof(packet_buffer[next_seq_no % window_size]), 0, (struct sockaddr *)&addr, sizeof(addr));
-          // Se e' attivato il timer dinamico campiono per calcolare l'rtt
           if ((dyn_timer_enable) && (!RTT_sample_enable))
           {
             RTT_sample_enable = true;
@@ -197,7 +164,6 @@ void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool d
           }
           printf("++++++++++++++Pacchetto %d inviato++++++++++++++\n", ntohl(packet_buffer[next_seq_no % window_size].seq_no));
           pkg_send++;
-          // Se il next sequence number corrisponde con la base lancia il timer
           if (base == next_seq_no)
           {
             timer_sample = clock();
@@ -218,8 +184,6 @@ void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool d
           packet_buffer[next_seq_no % window_size].seq_no = htonl(next_seq_no);
           packet_buffer[next_seq_no % window_size].type = htons(NORMAL);
           sendto(sockfd, &packet_buffer[next_seq_no % window_size], sizeof(packet_buffer[next_seq_no % window_size]), 0, (struct sockaddr *)&addr, sizeof(addr));
-
-          // Se e' attivato il timer dinamico campiono per calcolare l'rtt
            if ((dyn_timer_enable) && (!RTT_sample_enable))
           {
             RTT_sample_enable = true;
@@ -227,7 +191,6 @@ void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool d
           }
           printf("++++++++++Inviato pacchetto %d++++++++++++++\n", ntohl(packet_buffer[next_seq_no % window_size].seq_no));
           pkg_send++;
-          // Se il next  sequence number corrisponde con la base lancia il timer
           if (base == next_seq_no)
           {
             timer_sample = clock();
@@ -256,7 +219,6 @@ void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool d
       }
     }
 
-    // Controllo se ci sono ack
     if (recvfrom(sockfd, &ack, sizeof(struct data_packet), MSG_DONTWAIT, (struct sockaddr *)&addr, &len) > 0)
     {
       if (!simulate_loss(loss_rate))
@@ -272,13 +234,13 @@ void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool d
             estimated_RTT = (double)(0.875 * estimated_RTT) + (0.125 * sample_RTT);
             printf(" ESTIMATED RTT = %f ", estimated_RTT);
             dev_RTT = (double)(0.75 * dev_RTT) + (0.25 * fabs(sample_RTT - estimated_RTT));
-            printf(" DEV RTT = %f\n", dev_RTT);
+            printf(" DEV RTT = %f ", dev_RTT);
             timer = (double)estimated_RTT + (4 * dev_RTT);        
-            printf("++++++++++++++ACK %d ricevuto,  timer = %f ++++++++++++++\n", ntohl(ack.seq_no), timer);
+            printf(" timer = %f \n", timer);
         
         }
         else{
-          printf("++++++++++++++ACK %d ricevuto++++++++++++++\n", ntohl(ack.seq_no));
+          printf("ACK %d ricevuto\n", ntohl(ack.seq_no));
         } 
         if (base == next_seq_no)
         {
@@ -290,15 +252,12 @@ void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool d
       }
     }
   }
-  // Pulizia
   memset((void *)&ack, 0, sizeof(ack));
   memset((void *)&data, 0, sizeof(data));
   trial_counter = 0;
-// Termine operazione
 input_termination:
   while (1)
   {
-    // Se faccio troppi tentativi lascio stare probabilmente il client e' morto
     if (trial_counter >= MAX_TRIALS_NO)
     {
       if (ntohs(data.length) > 0)
@@ -308,7 +267,6 @@ input_termination:
       break;
     }
 
-    // Invio il FIN solo se devo farlo per la prima volta o lo rinvio in caso di timeout per non inviarne inutilmente
     if (!FIN_sended)
     {
       data.type = htons(FIN);
@@ -316,7 +274,6 @@ input_termination:
       sendto(sockfd, &data, sizeof(data), 0, (struct sockaddr *)&addr, sizeof(addr));
       FIN_sended = true;
 
-      // Start timer
       timer_sample = clock();
       timer_enable = true;
       printf("Inviato FIN\n");
@@ -328,7 +285,6 @@ input_termination:
       FIN_sended = false;
     }
 
-    // Attendo FINACK
     if (recvfrom(sockfd, &ack, sizeof(ack), MSG_DONTWAIT, (struct sockaddr *)&addr, &len) > 0)
     {
       if (!simulate_loss(loss_rate))
@@ -362,31 +318,23 @@ input_termination:
   close(sockfd);
 }
 
-/// download
-/// @param sockfd 
-/// @param type 
-/// @param data 
-/// @param addr 
-/// @param loss_rate 
-/// @param rm_string 
-void download(int sockfd, struct data_packet data, struct sockaddr_in addr, float loss_rate, char *rm_string)
+void download(int sockfd, struct data_packet data, struct sockaddr_in addr, float loss_rate)
 {
   int fd, trial_counter = 0, len = sizeof(addr), n;
   struct data_packet ack;
   long expected_seq_no = 0;
   int pkg_loss = 0, pkg_receive=0;
   int type = data.type;
+  char *rm_string;
 
+  rm_string = malloc(strlen(data.data) + 3);
+  sprintf(rm_string, "rm %s", data.data);
 
   if (type != LIST)
   {
-    // Apro file
     if ((fd = open(data.data, O_RDWR | O_CREAT | O_TRUNC, 0666)) < 0)
     {
       perror("errore apertura/creazione file da ricevere");
-      if(system(rm_string) == -1){
-        printf("errore system\n");
-      };
       exit(EXIT_FAILURE);
     }
   }
@@ -394,11 +342,8 @@ void download(int sockfd, struct data_packet data, struct sockaddr_in addr, floa
   memset((void *)&data, 0, sizeof(data));
   memset((void *)&ack, 0, sizeof(ack));
   ack.seq_no = htonl(-1);
-  // Ricevo dati
   while (1)
   {
-
-    // Se ci sono troppi errori di lettura lascio stare
     if (trial_counter >= MAX_TRIALS_NO)
     {
       printf("Il client e' morto oppure il canale e' molto disturbato, errore: %s", data.data);
@@ -415,17 +360,15 @@ void download(int sockfd, struct data_packet data, struct sockaddr_in addr, floa
 
     if (!simulate_loss(loss_rate))
     {
-      // Se arriva un pacchetto in ordine lo riscontro e aggiorno il numero di sequenza che mi aspetto
       if (ntohl(data.seq_no) == expected_seq_no)
       {
         if (ntohs(data.type) == FIN)
         {
-          // Se e' un FIN di errore printo l'errore, rimuovo il file sporco ed esco
           if (ntohs(data.length) > 0)
           {
             printf("%s\n", data.data);
             if(system(rm_string) == -1){
-              printf("errore system\n");
+              printf("errore rimozione file\n");
             };
           }
           else
@@ -459,16 +402,12 @@ void download(int sockfd, struct data_packet data, struct sockaddr_in addr, floa
           expected_seq_no++;
         }
       }
-      // Invio ack
       sendto(sockfd, &ack, sizeof(ack), 0, (struct sockaddr *)&addr, sizeof(addr));
-      //printf("ACK %d inviato\n", ntohl(ack.seq_no));
     }
     else{
       pkg_loss++;
     }
   }
-
-  // Invio FINACK
   sendto(sockfd, &ack, sizeof(ack), 0, (struct sockaddr *)&addr, sizeof(addr));
   printf("FIN ACK inviato\n");
   if (type != LIST)
@@ -480,13 +419,6 @@ void download(int sockfd, struct data_packet data, struct sockaddr_in addr, floa
   close(sockfd);
 }
 
-/// send_request
-/// @param sockfd 
-/// @param type 
-/// @param data 
-/// @param timer 
-/// @param dyn_timer_enable 
-/// @return 
 bool send_request(int sockfd, int type, struct data_packet data, double timer, bool dyn_timer_enable, float loss_rate)
 {
   int trial_counter = 0;
@@ -494,11 +426,8 @@ bool send_request(int sockfd, int type, struct data_packet data, double timer, b
   struct data_packet ack;
   clock_t timer_sample;
 
-  // Invio richiesta
   while (1)
   {
-
-    // Se faccio troppi tentativi lascio stare probabilmente il server e' morto
     if (trial_counter >= MAX_TRIALS_NO)
     {
       printf("Il server e' morto oppure il canale e' molto disturbato ritenta piu' tardi\n");
@@ -507,8 +436,6 @@ bool send_request(int sockfd, int type, struct data_packet data, double timer, b
 
     if (!command_sended)
     {
-
-      // Invia al server il pacchetto di richiesta
       data.type = htons(type);
       if (send(sockfd, &data, sizeof(data), 0) < 0)
       {
@@ -517,7 +444,6 @@ bool send_request(int sockfd, int type, struct data_packet data, double timer, b
       }
       printf("Inviata richiesta\n");
       command_sended = true;
-      // Start timer
       timer_sample = clock();
       timer_enable = true;
     }
@@ -526,8 +452,6 @@ bool send_request(int sockfd, int type, struct data_packet data, double timer, b
     {
       command_sended = false;
     }
-
-    // Attendo ACK richiesta
     if (recv(sockfd, &ack, sizeof(ack), MSG_DONTWAIT) > 0)
     {
       if (ntohs(ack.type) == type)
@@ -541,11 +465,6 @@ bool send_request(int sockfd, int type, struct data_packet data, double timer, b
   return true;
 }
 
-/// get_client 
-/// @param sockfd 
-/// @param servaddr 
-/// @param timer 
-/// @param loss_rate 
 void get_client(int sockfd, struct sockaddr_in servaddr, double timer, float loss_rate,  bool dyn_timer_enable)
 {
   struct data_packet data;
@@ -554,8 +473,6 @@ void get_client(int sockfd, struct sockaddr_in servaddr, double timer, float los
   char file_name[256];
 
   memset((void *)&data, 0, sizeof(data));
-
-// Scelta del file da scaricare dal server
 file_choice:
   printf("Inserire il nome del file da scaricare (con estensione):\n");
   if (scanf("%s", file_name) != 1)
@@ -568,26 +485,17 @@ file_choice:
     goto file_choice;
   }
 
-  printf("E' stato scelto %s \n", data.data);
-
-  // Utile solo per la pulizia della directory in caso di errori
-
   gettimeofday(&start, NULL);
 
   sprintf(data.data, "./files/%s", file_name);
-
-  rm_string = malloc(strlen(data.data) + 3);
-  sprintf(rm_string, "rm %s", data.data);
-
 
   if (!send_request(sockfd, GET, data, timer, dyn_timer_enable, loss_rate))
   {
     exit(EXIT_FAILURE);
   }
   
-  
   data.type = GET;
-  download(sockfd, data, servaddr, loss_rate, rm_string);
+  download(sockfd, data, servaddr, loss_rate);
   printf("\nGET terminata\n\n");
 
   gettimeofday(&end, NULL);
@@ -600,11 +508,6 @@ file_choice:
   exit(EXIT_SUCCESS);
 }
 
-/// list_client
-/// @param sockfd 
-/// @param servaddr 
-/// @param timer 
-/// @param loss_rate 
 void list_client(int sockfd, struct sockaddr_in servaddr, double timer, float loss_rate,  bool dyn_timer_enable)
 {
   struct data_packet data;
@@ -612,25 +515,19 @@ void list_client(int sockfd, struct sockaddr_in servaddr, double timer, float lo
   struct timeval start, end;
 
   memset((void *)&data, 0, sizeof(data));
-
-  // Utile solo per la pulizia della directory in caso di errori
-  rm_string = malloc(strlen(data.data) + 3);
-  sprintf(rm_string, "rm %s", data.data);
-
   gettimeofday(&start, NULL);
 
   if (!send_request(sockfd, LIST, data, timer, dyn_timer_enable, loss_rate))
   {
     exit(EXIT_FAILURE);
   }
-  // Pulizia
   memset((void *)&data, 0, sizeof(data));
 
   printf("Lista dei file su server:\n\n");
 
   data.type = LIST;
 
-  download(sockfd, data, servaddr, loss_rate, rm_string);
+  download(sockfd, data, servaddr, loss_rate);
 
   printf("\nLIST terminata\n\n");
 
@@ -644,20 +541,12 @@ void list_client(int sockfd, struct sockaddr_in servaddr, double timer, float lo
   exit(EXIT_SUCCESS);
 }
 
-/// put_client
-/// @param sockfd 
-/// @param servaddr 
-/// @param timer 
-/// @param window_size 
-/// @param loss_rate 
 void put_client(int sockfd, struct sockaddr_in servaddr, double timer, int window_size, float loss_rate, bool dyn_timer_enable)
 {
   struct data_packet data;
   struct timeval start, end;
   char file_name[256];
   memset((void *)&data, 0, sizeof(data));
-
-// Scelta del file da caricare su server
 file_choice:
   printf("Inserire il nome del file da caricare (con estensione):\n");
   if (scanf("%s", file_name) != 1)
@@ -693,13 +582,6 @@ file_choice:
   exit(EXIT_SUCCESS);
 }
 
-/// get_server
-/// @param sockfd 
-/// @param addr 
-/// @param timer 
-/// @param window_size 
-/// @param loss_rate 
-/// @param file_name 
 void get_server(int sockfd, struct sockaddr_in addr, double timer, int window_size, float loss_rate, char *file_name, bool dyn_timer_enable)
 {
   struct data_packet data;
@@ -714,35 +596,20 @@ void get_server(int sockfd, struct sockaddr_in addr, double timer, int window_si
   exit(EXIT_SUCCESS);
 }
 
-/// put_server
-/// @param sockfd 
-/// @param addr 
-/// @param loss_rate 
-/// @param file_name 
 void put_server(int sockfd, struct sockaddr_in addr, float loss_rate, char *file_name)
 {
   struct data_packet data;
   char *rm_string;
-  // Pulizia
   memset((void *)&data, 0, sizeof(data));
 
-  // Utile solo per la pulizia della directory in caso di errori
-  rm_string = malloc(strlen(data.data) + 3);
   sprintf(data.data, "%s", file_name);
-  sprintf(rm_string, "rm %s", data.data);
   data.type= PUT;
-  download(sockfd, data, addr, loss_rate, rm_string);
+  download(sockfd, data, addr, loss_rate);
   close(sockfd);
   printf("\nPut terminata\n\n");
   exit(EXIT_SUCCESS);
 }
 
-/// list_server
-/// @param sockfd 
-/// @param addr 
-/// @param timer 
-/// @param window_size 
-/// @param loss_rate 
 void list_server(int sockfd, struct sockaddr_in addr, double timer, int window_size, float loss_rate, bool dyn_timer_enable )
 {
   struct data_packet data;
