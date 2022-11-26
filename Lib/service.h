@@ -81,7 +81,7 @@ void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool d
   struct data_packet *packet_buffer;
   struct data_packet ack;
   clock_t start_sample_RTT;
-  double RTT_sample_enable = false, sample_RTT = 0, estimated_RTT = 0, dev_RTT = 0;
+  double sample_RTT = 0, estimated_RTT = 0, dev_RTT = 0;
   int trial_counter = 0, len = sizeof(addr), fd;
   bool FIN_sended = false, timer_enable = false;
   long base = 0, next_seq_no = 0;
@@ -157,9 +157,8 @@ void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool d
           packet_buffer[next_seq_no % window_size].seq_no = htonl(next_seq_no);
           packet_buffer[next_seq_no % window_size].type = htons(NORMAL);
           sendto(sockfd, &packet_buffer[next_seq_no % window_size], sizeof(packet_buffer[next_seq_no % window_size]), 0, (struct sockaddr *)&addr, sizeof(addr));
-          if ((dyn_timer_enable) && (!RTT_sample_enable))
+          if ((dyn_timer_enable))
           {
-            RTT_sample_enable = true;
             start_sample_RTT = clock();
           }
           printf("++++++++++++++Pacchetto %d inviato++++++++++++++\n", ntohl(packet_buffer[next_seq_no % window_size].seq_no));
@@ -184,9 +183,8 @@ void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool d
           packet_buffer[next_seq_no % window_size].seq_no = htonl(next_seq_no);
           packet_buffer[next_seq_no % window_size].type = htons(NORMAL);
           sendto(sockfd, &packet_buffer[next_seq_no % window_size], sizeof(packet_buffer[next_seq_no % window_size]), 0, (struct sockaddr *)&addr, sizeof(addr));
-           if ((dyn_timer_enable) && (!RTT_sample_enable))
+           if ((dyn_timer_enable))
           {
-            RTT_sample_enable = true;
             start_sample_RTT = clock();
           }
           printf("++++++++++Inviato pacchetto %d++++++++++++++\n", ntohl(packet_buffer[next_seq_no % window_size].seq_no));
@@ -210,9 +208,8 @@ void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool d
         timer_sample = clock();
         sendto(sockfd, &packet_buffer[i], sizeof(packet_buffer[i]), 0, (struct sockaddr *)&addr, sizeof(addr));
         pkg_resend++;
-        if ((dyn_timer_enable) && (!RTT_sample_enable))
+        if ((dyn_timer_enable) )
         {
-           RTT_sample_enable = true;
           start_sample_RTT = clock();
         }
         printf("Pacchetto %d ritrasmesso\n", ntohl(packet_buffer[i].seq_no));
@@ -225,9 +222,8 @@ void upload(int sockfd, struct sockaddr_in addr, struct data_packet data, bool d
       {
         base = ntohl(ack.seq_no) + 1;
         trial_counter = 0;
-        if ((dyn_timer_enable) && (RTT_sample_enable))
+        if ((dyn_timer_enable) )
         { 
-            RTT_sample_enable = false;
             printf("++++++++++++++RICALCOLO TIMER++++++++++++++\n");
             sample_RTT = (double)(clock() - start_sample_RTT) * 1000 / CLOCKS_PER_SEC;
             printf("SAMPLE RTT = %f ", sample_RTT);
