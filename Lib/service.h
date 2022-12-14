@@ -498,8 +498,9 @@ file_choice:
 
   long seconds = (end.tv_sec - start.tv_sec);
   long micros = ((seconds * 1000000) + end.tv_usec) - (start.tv_usec);
+  long ms = micros/1000;
 
-  printf("La GET ha impiegato %ld secondi e %ld microsecondi\n", seconds, micros);
+  printf("La GET ha impiegato %ld ms.\n", ms);
 
   exit(EXIT_SUCCESS);
 }
@@ -531,8 +532,9 @@ void list_client(int sockfd, struct sockaddr_in servaddr, double timer, float lo
 
   long seconds = (end.tv_sec - start.tv_sec);
   long micros = ((seconds * 1000000) + end.tv_usec) - (start.tv_usec);
+  long ms = micros/1000;
 
-  printf("La LIST ha impiegato %ld secondi e %ld microsecondi\n", seconds, micros);
+  printf("La LIST ha impiegato %ld ms.\n", ms);
 
   exit(EXIT_SUCCESS);
 }
@@ -572,8 +574,9 @@ file_choice:
 
   long seconds = (end.tv_sec - start.tv_sec);
   long micros = ((seconds * 1000000) + end.tv_usec) - (start.tv_usec);
+  long ms = micros/1000;
 
-  printf("La PUT ha impiegato %ld secondi e %ld microsecondi\n", seconds, micros);
+  printf("La PUT ha impiegato %ld ms.\n", ms);
 
   exit(EXIT_SUCCESS);
 }
